@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン | Quiz App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1 id="pageTitle">ログイン</h1>
+
+  <div id="loginScreen">
+    <p>メールアドレスとパスワードを入力してください：</p>
+    <input type="email" id="email" placeholder="メールアドレス">
+    <input type="password" id="password" placeholder="パスワード">
+    <button onclick="login()">ログイン</button>
+    <p id="loginMessage" style="color:red;"></p>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    const SUPABASE_URL = 'https://hlkmffnbilhchimxyilh.supabase.co'
+    const SUPABASE_ANON_KEY = 'sb_publishable_8NegZvRtaKWRKIEIZlQdYA_D-C1zfr8'
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    // すでにログイン済みなら index.html へリダイレクト
+    const existingUser = localStorage.getItem("quiz_user")
+    if (existingUser) {
+      window.location.href = "index.html"
+    }
+
+    window.login = async function() {
+      const email = document.getElementById("email").value.trim()
+      const password = document.getElementById("password").value.trim()
+
+      if (!email || !password) {
+        document.getElementById("loginMessage").textContent = "メールとパスワードを入力してください。"
+        return
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (error) {
+        console.error(error)
+        document.getElementById("loginMessage").textContent = "メールまたはパスワードが違います"
+        return
+      }
+
+      localStorage.setItem("quiz_user", data.user.id)
+      window.location.href = "index.html"
+    }
+  </script>
+</body>
+</html>

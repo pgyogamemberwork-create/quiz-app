@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1 id="pageTitle">年度を選択</h1>
+
+  <!-- 年度選択 -->
+  <div id="yearSelect">
+    <h3>年度を選択してください</h3>
+    <button onclick="selectYear('R7')">令和7年度</button>
+    <button onclick="selectYear('R6')">令和6年度</button>
+    <button onclick="selectYear('R5')">令和5年度</button>
+    <button onclick="selectYear('R4')">令和4年度</button>
+    <button onclick="selectYear('R3')">令和3年度</button>
+    <button onclick="selectYear('R2')">令和2年度</button>
+  </div>
+
+  <!-- メニュー -->
+  <div id="menu" style="display:none;">
+    <h3>出題範囲を選択</h3>
+    <button id="btnAll" onclick="startQuiz('all')">全問題</button>
+    <button onclick="startQuiz('random10')">ランダム10問</button>
+    <hr>
+    <div id="rangeButtons"></div>
+    <hr>
+    <button onclick="backToYearSelect()">年度選択に戻る</button>
+    <button onclick="logout()">ログアウト</button>
+  </div>
+
+  <!-- クイズ画面 -->
+  <div id="quiz" style="display:none;"></div>
+  <p class="result" id="result"></p>
+  <button id="nextBtn" style="display:none;">次の問題へ</button>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    const SUPABASE_URL = 'https://hlkmffnbilhchimxyilh.supabase.co'
+    const SUPABASE_ANON_KEY = 'sb_publishable_8NegZvRtaKWRKIEIZlQdYA_D-C1zfr8'
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    // 未ログインなら login.html へリダイレクト
+    const userId = localStorage.getItem("quiz_user")
+    if (!userId) {
+      window.location.href = "login.html"
+    }
+
+    let questions = []
+    let selectedQuestions = []
+    let current = 0
+    let locked = false
+    let correctCount = 0
+    let rangeOffset = 0
+    let selectedYear = ''
+
+    window.selectYear = async function(year) {
+      selectedYear = year
+      localStorage.setItem("selected_year", year)
+      document.getElementById("yearSelect").style.display = "none"
+      document.getElementById("menu").style.display = "block"
+      document.getElementById("pageTitle").textContent = "出題範囲を選択"
+
+      questions = await getQuizData(year.toLowerCase())
+
+      createRangeButtons()
+
+      const scoreMap = await updateScores()
+
+      updateMedalDisplay(scoreMap)
+    }
+
+    async function getQuizData(year) {
+      console.log("getQuizData呼ばれた", year)
+
+      const { data, error } = await supabase
+        .from("questions")
+        .select("*")
+        .eq("year", year)
+
+      console.log("data", data)
+      console.log("error", error)
+
+      return data.map(q => ({
+        ...q,
+        choices: [
+          q.choice_a,
+          q.choice_b,
+          q.choice_c,
+          q.choice_d
+        ]
+      }))
+    }
+
+    async function recordResult(userId, questionId, isCorrect) {
+      const { data, error } = await supabase
+        .from("answer_logs")
+        .insert([
+          {
+            user_id: userId,
+            question_id: questionId,
+            is_correct: isCorrect
+          }
+        ])
+
+      if (error) {
+        console.error("answer_logs保存エラー", error)
+      }
+    }
+
+    async function updateScores() {
+      const userId = localStorage.getItem("quiz_user")
+
+      const { data, error } = await supabase
+        .from('answer_logs')
+        .select('*')
+        .eq('user_id', userId)
+
+      if (error) {
+        console.error(error)
+        return {}
+      }
+
+      const buttons = document.querySelectorAll("#rangeButtons button")
+
+      let scoreMap = {}
+
+      buttons.forEach((btn, index) => {
+        const text = btn.textContent
+        const match = text.match(/(\d+)〜(\d+)/)
+
+        if (!match) return
+
+        const start = parseInt(match[1])
+        const end = parseInt(match[2])
+
+        const questionIds = questions
+          .slice(start - 1, end)
+          .map(q => q.id)
+
+        const total = questionIds.length
+
+        const logs = data.filter(log =>
+          questionIds.includes(log.question_id)
+        )
+
+        let bronzeCount = 0
+        let silverCount = 0
+        let goldCount = 0
+
+        questionIds.forEach(qid => {
+          const correctTimes = logs.filter(l =>
+            l.question_id === qid && l.is_correct
+          ).length
+
+          if (correctTimes >= 1) bronzeCount++
+          if (correctTimes >= 3) silverCount++
+          if (correctTimes >= 5) goldCount++
+        })
+
+        scoreMap[index + 1] = {
+          bronzeCount,
+          silverCount,
+          goldCount
+        }
+      })
+
+      return scoreMap
+    }
+
+    window.startQuiz = function(range) {
+      if (range === 'all') {
+        selectedQuestions = shuffleArray(questions)
+        rangeOffset = 0
+      } else if (range === 'random10') {
+        selectedQuestions = shuffleArray(questions).slice(0, 10)
+        rangeOffset = 0
+      } else {
+        const [start, end] = range.split('-').map(Number)
+        selectedQuestions = shuffleArray(questions.slice(start - 1, end))
+        rangeOffset = start - 1
+      }
+
+      correctCount = 0
+      document.getElementById('menu').style.display = 'none'
+      document.getElementById('quiz').style.display = 'block'
+      document.getElementById('pageTitle').textContent = "問題"
+
+      current = 0
+      showQuestion()
+      window.addEventListener('keydown', handleKey)
+    }
+
+    // 改行コード(\n)をHTMLの<br>に変換するヘルパー
+    function nl2br(text) {
+      if (!text) return ''
+      return text.replace(/\r\n|\r|\n/g, '<br>')
+    }
+
+    function showQuestion() {
+      const q = selectedQuestions[current]
+      const quizDiv = document.getElementById('quiz')
+      document.getElementById('result').textContent = ""
+      locked = false
+
+      document.getElementById('pageTitle').textContent = `問題 (${current + 1}/${selectedQuestions.length})`
+      let html = `<h3>${nl2br(q.question)}</h3>`
+      if (q.image_url)
+        html += `<img src="${q.image_url}" style="max-width:100%; margin:1em 0;">`
+      quizDiv.innerHTML = html
+
+      const labeledChoices = [
+        { label: "ア", alt: ["A", "1"], text: q.choices[0] },
+        { label: "イ", alt: ["B", "2"], text: q.choices[1] },
+        { label: "ウ", alt: ["C", "3"], text: q.choices[2] },
+        { label: "エ", alt: ["D", "4"], text: q.choices[3] }
+      ]
+
+      const shuffled = shuffleArray(labeledChoices)
+      const correctSymbol = q.correct.trim().toUpperCase()
+      const correctChoice = shuffled.find(c => c.label === correctSymbol || c.alt.includes(correctSymbol))
+      const correctIndex = shuffled.indexOf(correctChoice)
+      q.correctIndex = correctIndex
+
+      shuffled.forEach((c, i) => {
+        const btn = document.createElement('button')
+        btn.innerHTML = `(${i + 1}) ${nl2br(c.text)}`
+        btn.onclick = () => handleAnswer(c, correctSymbol, q.explanation, i, correctIndex)
+        quizDiv.appendChild(btn)
+      })
+
+      const hint = document.createElement('p')
+      hint.className = "shortcut"
+      hint.textContent = "※ キーボードの1〜4キーでも選択可能"
+      quizDiv.appendChild(hint)
+    }
+
+    function handleAnswer(selected, correctSymbol, explanation, selectedIndex, correctIndex) {
+      if (locked) return
+      locked = true
+
+      const result = document.getElementById('result')
+      const isCorrect = selectedIndex === correctIndex
+      const questionId = selectedQuestions[current].id
+
+      if (isCorrect) {
+        correctCount++
+        result.innerHTML = `<span style="color:green;">正解！</span>`
+      } else {
+        result.innerHTML =
+          `<span style="color:red;">不正解（正解は ${correctIndex + 1}）</span><br>
+          <div class="explanation">${nl2br(explanation) || "解説はありません。"}</div>`
+      }
+
+      recordResult(localStorage.getItem("quiz_user"), questionId, isCorrect)
+      updateScores()
+      document.getElementById('nextBtn').style.display = "block"
+    }
+
+    document.getElementById('nextBtn').onclick = () => {
+      current++
+      if (current >= selectedQuestions.length) {
+        document.getElementById('quiz').innerHTML = `<h3>終了！お疲れさま🎉</h3>
+        <p>正答数：${correctCount}/${selectedQuestions.length}</p>`
+        document.getElementById('nextBtn').style.display = "none"
+        document.getElementById('result').innerHTML = ""
+        window.removeEventListener('keydown', handleKey)
+      } else {
+        document.getElementById('nextBtn').style.display = "none"
+        showQuestion()
+      }
+    }
+
+    function handleKey(e) {
+      const key = e.key
+      if (locked && key === "Enter") document.getElementById('nextBtn').click()
+      if (!locked && ["1", "2", "3", "4"].includes(key)) {
+        const btns = document.querySelectorAll("#quiz button")
+        btns[parseInt(key) - 1]?.click()
+      }
+    }
+
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        const temp = array[i]
+        array[i] = array[j]
+        array[j] = temp
+      }
+      return array
+    }
+
+    function createRangeButtons() {
+      const container = document.getElementById("rangeButtons")
+      container.innerHTML = ""
+
+      for (let i = 0; i < questions.length; i += 10) {
+        const start = i + 1
+        const end = Math.min(i + 10, questions.length)
+
+        const btn = document.createElement("button")
+        btn.onclick = () => startQuiz(`${start}-${end}`)
+        btn.innerHTML = `${start}〜${end}問 <span class="score">0/${end - start + 1}</span>`
+        container.appendChild(btn)
+      }
+    }
+
+    function updateMedalDisplay(scoreMap) {
+      const buttons = document.querySelectorAll("#rangeButtons button")
+
+      buttons.forEach((btn, index) => {
+        const block = index + 1
+        const data = scoreMap[block] || {
+          bronzeCount: 0,
+          silverCount: 0,
+          goldCount: 0
+        }
+
+        const bronze = data.bronzeCount > 0 ? `🥉${data.bronzeCount}/10` : ""
+        const silver = data.silverCount > 0 ? ` 🥈${data.silverCount}/10` : ""
+        const gold = data.goldCount > 0 ? ` 🥇${data.goldCount}/10` : ""
+
+        const medalText = `${bronze}${silver}${gold}`.trim()
+
+        const scoreEl = btn.querySelector(".score")
+        if (scoreEl) scoreEl.textContent = medalText
+      })
+    }
+
+    window.backToYearSelect = function() {
+      document.getElementById("menu").style.display = "none"
+      document.getElementById("yearSelect").style.display = "block"
+      document.getElementById("pageTitle").textContent = "年度を選択"
+    }
+
+    window.logout = function() {
+      localStorage.removeItem("quiz_user")
+      localStorage.removeItem("selected_year")
+      window.location.href = "login.html"
+    }
+  </script>
+</body>
+</html>

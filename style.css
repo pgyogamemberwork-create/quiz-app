@@ -1,0 +1,163 @@
+/* =============================
+   ベーススタイル（PC・共通）
+   ============================= */
+body {
+  font-family: Arial, sans-serif;
+  max-width: 500px;
+  margin: 2rem auto;
+}
+
+h1, h2, h3 {
+  margin-bottom: 0.4em;
+}
+
+.question {
+  margin-bottom: 1rem;
+}
+
+input {
+  display: block;
+  width: 100%;
+  font-size: 16px;
+  padding: 0.5em;
+  margin-bottom: 0.8em;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0.5em 0;
+  width: 100%;
+  font-size: 16px;
+  background: #f4f4f4;
+  border: 1px solid #ccc;
+  padding: 0.5em 1em;
+  border-radius: 6px;
+  cursor: pointer;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+button:hover {
+  background: #e0e0e0;
+}
+
+button .score {
+  margin-left: auto;
+  text-align: right;
+  font-weight: bold;
+}
+
+/* rangeButtons: 出題範囲ボタンを縦並びに */
+#rangeButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: 1rem;
+}
+
+#rangeButtons button {
+  width: 500px;
+  max-width: 100%;
+  padding: 0.5em 1em;
+  font-size: 1rem;
+}
+
+.result {
+  font-weight: bold;
+  margin-top: 1em;
+  font-size: 18px;
+}
+
+.shortcut {
+  font-size: 12px;
+  color: #666;
+}
+
+.explanation {
+  background: #f9f9f9;
+  border-left: 4px solid #4CAF50;
+  padding: 0.6em 1em;
+  margin-top: 0.8em;
+  border-radius: 6px;
+  color: #333;
+}
+
+.result-text {
+  font-weight: bold;
+  text-align: center;
+  display: block;
+  margin: 0.5em 0 0.8em;
+}
+
+
+/* =============================
+   スマホ対応（〜1000px）
+   ============================= */
+@media (max-width: 1000px) {
+  body {
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 1.2em;
+    box-sizing: border-box;
+    font-size: 20px;
+    line-height: 1.7;
+  }
+
+  h1, h2, h3 {
+    font-size: 1.6em;
+    margin-bottom: 0.6em;
+  }
+
+  p {
+    font-size: 1.15em;
+    margin-bottom: 1em;
+  }
+
+  input {
+    font-size: 20px;
+    padding: 1em;
+    border-radius: 8px;
+  }
+
+  button {
+    font-size: 40px;
+    padding: 1em 1.2em;
+    border-radius: 12px;
+    min-height: 80px;
+    line-height: 1.3;
+  }
+
+  #rangeButtons button {
+    width: 100%;
+  }
+
+  button span,
+  button .score,
+  button * {
+    font-size: inherit;
+    vertical-align: middle;
+  }
+
+  .score {
+    font-size: 40px;
+  }
+
+  .shortcut {
+    font-size: 30px;
+  }
+
+  .explanation {
+    font-size: 40px;
+    padding: 1em 1.2em;
+  }
+
+  .result-text {
+    font-size: 44px;
+  }
+}
