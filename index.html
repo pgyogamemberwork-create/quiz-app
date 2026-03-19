@@ -29,6 +29,7 @@
     <div id="rangeButtons"></div>
     <hr>
     <button onclick="backToYearSelect()">年度選択に戻る</button>
+    <button id="theme-toggle-btn">テーマ切替</button>
     <button onclick="logout()">ログアウト</button>
   </div>
 
@@ -342,6 +343,36 @@
       localStorage.removeItem("selected_year")
       window.location.href = "login.html"
     }
+
+    // --- ここからテーマ切り替え処理 ---
+    const themeToggleButton = document.getElementById('theme-toggle-btn');
+    const body = document.body;
+
+    function applyTheme(theme) {
+      if (theme === 'dark') {
+        body.setAttribute('data-theme', 'dark');
+        themeToggleButton.textContent = 'ライトモードに';
+      } else {
+        body.removeAttribute('data-theme');
+        themeToggleButton.textContent = 'ダークモードに';
+      }
+    }
+
+    function toggleTheme() {
+      const currentTheme = localStorage.getItem('theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', newTheme);
+      applyTheme(newTheme);
+    }
+
+    themeToggleButton.addEventListener('click', toggleTheme);
+
+    // 初期読み込み時にテーマを適用
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      applyTheme(savedTheme);
+    }
+    // --- ここまでテーマ切り替え処理 ---
   </script>
 </body>
 </html>
